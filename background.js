@@ -128,7 +128,7 @@ function showSuccess(count, total, resultUrl) {
     el.style.cssText = 'position:fixed;top:20px;right:20px;background:#f0913a;color:white;padding:16px 24px;border-radius:12px;font-family:-apple-system,sans-serif;font-size:15px;font-weight:600;z-index:999999;box-shadow:0 4px 20px rgba(0,0,0,0.15);cursor:pointer';
     document.body.appendChild(el);
   }
-  el.textContent = 'Saved to AI Notes (' + count + '/' + total + ' images)';
+  el.textContent = 'Saved to Notes (' + count + '/' + total + ' images)';
   el.style.cursor = 'pointer';
   el.onclick = function() { window.open(resultUrl, '_blank'); };
   setTimeout(function() {

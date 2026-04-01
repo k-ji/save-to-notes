@@ -1,4 +1,4 @@
-# Save to AI Notes
+# Save to Notes
 
 A Chrome extension that saves any web page as a self-contained HTML file with all images embedded. One click to capture articles, blog posts, research — complete with images, ready for offline reading or AI processing.
 
@@ -47,7 +47,7 @@ Click the extension icon to open the popup. The default server URL is `http://lo
 ## Usage
 
 1. Navigate to any article or web page
-2. Click the **Save to AI Notes** icon (or open popup → **Capture Page**)
+2. Click the **Save to Notes** icon (or open popup → **Capture Page**)
 3. The extension extracts content, downloads images, and sends everything to your server
 4. A toast notification confirms the save with an image count
 
@@ -85,7 +85,7 @@ You can implement this endpoint in any language/framework — the example Python
 ## Project Structure
 
 ```
-save-to-ai-notes/
+save-to-notes/
 ├── manifest.json        # Chrome extension manifest (v3)
 ├── background.js        # Service worker: image download + server communication
 ├── popup.html           # Extension popup UI

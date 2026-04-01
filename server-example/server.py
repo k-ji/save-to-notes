@@ -1,5 +1,5 @@
 """
-Minimal example backend for the Save to AI Notes Chrome extension.
+Minimal example backend for the Save to Notes Chrome extension.
 
 Receives POST requests at /save-blog-post with article content and saves
 them as self-contained HTML files with embedded images.
@@ -166,14 +166,14 @@ def make_handler(output_dir):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='AI Notes save server')
+    parser = argparse.ArgumentParser(description='Save to Notes server')
     parser.add_argument('--port', type=int, default=8765)
     parser.add_argument('--output-dir', default='./saved-articles')
     args = parser.parse_args()
 
     handler = make_handler(args.output_dir)
     server = http.server.HTTPServer(('0.0.0.0', args.port), handler)
-    print(f'AI Notes server running on http://localhost:{args.port}')
+    print(f'Save to Notes server running on http://localhost:{args.port}')
     print(f'Saving articles to: {os.path.abspath(args.output_dir)}')
     server.serve_forever()
 
