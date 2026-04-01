@@ -102,6 +102,17 @@ save-to-notes/
 - **Adjust content selectors**: Edit the `selectors` array in `popup.js` → `extractContent()`
 - **Change UI colors**: The toast uses `#f0913a` (orange) — search and replace in `background.js` and `popup.html`
 
+## Contributing
+
+Found a bug or have a feature request? [Open an issue](https://github.com/k-ji/save-to-notes/issues).
+
+Want to fix it yourself?
+
+1. Fork this repo
+2. Create a branch (`git checkout -b fix/my-fix`)
+3. Commit your changes
+4. Open a pull request
+
 ## License
 
 MIT
