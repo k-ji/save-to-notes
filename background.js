@@ -1,9 +1,9 @@
 var DEFAULT_SERVER = 'http://localhost:8765';
 
-// Helper: get configured server URL
-function getServerUrl(callback) {
-  chrome.storage.sync.get({ serverUrl: DEFAULT_SERVER }, function(data) {
-    callback(data.serverUrl.replace(/\/+$/, ''));
+// Helper: get configured settings
+function getSettings(callback) {
+  chrome.storage.sync.get({ serverUrl: DEFAULT_SERVER, saveFormat: 'html' }, function(data) {
+    callback(data.serverUrl.replace(/\/+$/, ''), data.saveFormat);
   });
 }
 
@@ -69,7 +69,7 @@ async function handleSaveArticle(msg, tabId) {
   });
 
   // Send to server
-  getServerUrl(async function(serverUrl) {
+  getSettings(async function(serverUrl, saveFormat) {
     try {
       var resp = await fetch(serverUrl + '/save-blog-post', {
         method: 'POST',
@@ -78,6 +78,7 @@ async function handleSaveArticle(msg, tabId) {
           title: title,
           html: html,
           url: url,
+          format: saveFormat,
           images: {},
           download_images: true
         })

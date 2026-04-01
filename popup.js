@@ -1,13 +1,15 @@
 var DEFAULT_SERVER = 'http://localhost:8765';
 
 var serverInput = document.getElementById('server-url');
+var formatSelect = document.getElementById('save-format');
 var saveBtn = document.getElementById('save-btn');
 var captureBtn = document.getElementById('capture-btn');
 var statusEl = document.getElementById('status');
 
 // Load saved settings
-chrome.storage.sync.get({ serverUrl: DEFAULT_SERVER }, function(data) {
+chrome.storage.sync.get({ serverUrl: DEFAULT_SERVER, saveFormat: 'html' }, function(data) {
   serverInput.value = data.serverUrl;
+  formatSelect.value = data.saveFormat;
 });
 
 // Save settings
@@ -18,7 +20,7 @@ saveBtn.addEventListener('click', function() {
     statusEl.className = 'status error';
     return;
   }
-  chrome.storage.sync.set({ serverUrl: url }, function() {
+  chrome.storage.sync.set({ serverUrl: url, saveFormat: formatSelect.value }, function() {
     statusEl.textContent = 'Settings saved';
     statusEl.className = 'status success';
     setTimeout(function() { statusEl.textContent = ''; }, 2000);

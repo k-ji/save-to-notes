@@ -2,10 +2,15 @@
 Minimal example backend for the Save to Notes Chrome extension.
 
 Receives POST requests at /save-blog-post with article content and saves
-them as self-contained HTML files with embedded images.
+them as HTML, Markdown, or PDF files with embedded images.
 
 Usage:
     python server.py [--port 8765] [--output-dir ./saved-articles]
+
+Optional dependencies:
+    pip install requests        # Better image downloading
+    pip install markdownify     # Markdown format support
+    pip install weasyprint      # PDF format support
 """
 
 import argparse
@@ -23,6 +28,18 @@ try:
     REQUESTS_AVAILABLE = True
 except ImportError:
     REQUESTS_AVAILABLE = False
+
+try:
+    from markdownify import markdownify as md
+    MARKDOWNIFY_AVAILABLE = True
+except ImportError:
+    MARKDOWNIFY_AVAILABLE = False
+
+try:
+    from weasyprint import HTML as WeasyHTML
+    WEASYPRINT_AVAILABLE = True
+except ImportError:
+    WEASYPRINT_AVAILABLE = False
 
 
 def make_handler(output_dir):
@@ -48,9 +65,18 @@ def make_handler(output_dir):
             title = data.get('title', '').strip()
             html_content = data.get('html', '')
             source_url = data.get('url', '')
+            save_format = data.get('format', 'html')
 
             if not title or not html_content:
                 self.send_json({'error': 'title and html required'}, 400)
+                return
+
+            # Validate format and dependencies
+            if save_format == 'markdown' and not MARKDOWNIFY_AVAILABLE:
+                self.send_json({'error': 'Markdown format requires markdownify: pip install markdownify'}, 400)
+                return
+            if save_format == 'pdf' and not WEASYPRINT_AVAILABLE:
+                self.send_json({'error': 'PDF format requires weasyprint: pip install weasyprint'}, 400)
                 return
 
             # Create slug from title
@@ -60,7 +86,8 @@ def make_handler(output_dir):
             save_dir = Path(output_dir)
             save_dir.mkdir(parents=True, exist_ok=True)
 
-            if (save_dir / f'{slug}.html').exists():
+            ext = {'html': '.html', 'markdown': '.md', 'pdf': '.pdf'}[save_format]
+            if (save_dir / f'{slug}{ext}').exists():
                 slug = f'{slug}-{datetime.now().strftime("%H%M%S")}'
 
             # Download remaining external images server-side
@@ -70,7 +97,7 @@ def make_handler(output_dir):
                     html_content, source_url
                 )
 
-            # Wrap in a styled HTML page
+            # Build styled HTML (used by html and pdf formats)
             styled_html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -106,15 +133,66 @@ def make_handler(output_dir):
 </body>
 </html>"""
 
-            filepath = save_dir / f'{slug}.html'
-            filepath.write_text(styled_html, encoding='utf-8')
-            print(f'Saved: {filepath} ({len(styled_html):,} bytes)')
+            filepath = save_dir / f'{slug}{ext}'
+
+            if save_format == 'html':
+                filepath.write_text(styled_html, encoding='utf-8')
+
+            elif save_format == 'markdown':
+                # Save images to a subfolder, replace base64 with local paths
+                images_dir = save_dir / f'{slug}_images'
+                markdown_content = self.html_to_markdown(
+                    html_content, title, source_url, images_dir, slug
+                )
+                filepath.write_text(markdown_content, encoding='utf-8')
+
+            elif save_format == 'pdf':
+                WeasyHTML(string=styled_html).write_pdf(str(filepath))
+
+            file_size = filepath.stat().st_size
+            print(f'Saved [{save_format}]: {filepath} ({file_size:,} bytes)')
 
             self.send_json({
                 'ok': True,
-                'url': f'/{slug}.html',
+                'url': f'/{slug}{ext}',
                 'image_stats': image_stats
             })
+
+        def html_to_markdown(self, html_content, title, source_url, images_dir, slug):
+            """Convert HTML to Markdown, extracting base64 images to files."""
+            # Extract base64 images and save to files
+            img_counter = [0]
+            def replace_b64_img(match):
+                full_tag = match.group(0)
+                b64_match = re.search(r'src=["\']data:image/(\w+);base64,([^"\']+)["\']', full_tag)
+                if not b64_match:
+                    return full_tag
+                img_ext = b64_match.group(1)
+                if img_ext == 'jpeg':
+                    img_ext = 'jpg'
+                img_data = b64_match.group(2)
+                img_counter[0] += 1
+                img_filename = f'{slug}_{img_counter[0]:03d}.{img_ext}'
+                images_dir.mkdir(parents=True, exist_ok=True)
+                (images_dir / img_filename).write_bytes(base64.b64decode(img_data))
+                alt = re.search(r'alt=["\']([^"\']*)["\']', full_tag)
+                alt_text = alt.group(1) if alt else ''
+                return f'<img src="{slug}_images/{img_filename}" alt="{alt_text}">'
+
+            html_content = re.sub(r'<img[^>]+>', replace_b64_img, html_content)
+
+            # Convert to markdown
+            markdown = md(html_content, heading_style='ATX', strip=['script', 'style'])
+            # Clean up excessive blank lines
+            markdown = re.sub(r'\n{3,}', '\n\n', markdown).strip()
+
+            # Add header
+            header = f'# {title}\n\n'
+            if source_url:
+                header += f'Source: {source_url}\n'
+            header += f'Saved: {datetime.now().strftime("%Y-%m-%d %H:%M")}\n\n---\n\n'
+
+            return header + markdown
 
         def download_external_images(self, html_content, source_url):
             """Download any remaining external images and embed as base64."""

@@ -32,6 +32,17 @@
       outline: none;
     }
     input:focus { border-color: #f0913a; }
+    select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+      background: white;
+      margin-bottom: 8px;
+    }
+    select:focus { border-color: #f0913a; }
     .actions {
       display: flex;
       gap: 8px;
@@ -75,6 +86,13 @@
 
   <label for="server-url">Server URL</label>
   <input type="text" id="server-url" placeholder="http://localhost:8765">
+
+  <label for="save-format" style="margin-top:8px">Save Format</label>
+  <select id="save-format">
+    <option value="html">HTML</option>
+    <option value="markdown">Markdown</option>
+    <option value="pdf">PDF</option>
+  </select>
 
   <div class="divider"></div>
 

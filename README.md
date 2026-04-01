@@ -1,14 +1,14 @@
 # Save to Notes
 
-A Chrome extension that saves any web page as a self-contained HTML file with all images embedded. One click to capture articles, blog posts, research — complete with images, ready for offline reading or AI processing.
+A Chrome extension that saves any web page as HTML, Markdown, or PDF with all images preserved. One click to capture articles, blog posts, research — complete with images, ready for offline reading or AI processing.
 
 ## Features
 
 - **One-click capture** — click the extension icon or use the popup
+- **Multiple formats** — save as HTML (self-contained), Markdown (with image folder), or PDF
 - **Full image extraction** — downloads and embeds all images as base64 (including lazy-loaded, srcset, CSS backgrounds, Next.js proxied images)
 - **Smart content selection** — automatically finds the article content (tries `article`, `.post-content`, `[role=main]`, `main`, then falls back to `body`)
 - **Configurable server** — set your own backend URL in the popup
-- **Self-contained output** — saved HTML files work offline with all images inline
 
 ## Setup
 
@@ -32,17 +32,21 @@ python server.py
 Options:
 ```
 --port 8765              Server port (default: 8765)
---output-dir ./articles  Where to save HTML files (default: ./saved-articles)
+--output-dir ./articles  Where to save files (default: ./saved-articles)
 ```
 
-For better image downloading, install `requests`:
+Optional dependencies (install as needed):
 ```bash
-pip install requests
+pip install requests      # Better image downloading
+pip install markdownify   # Markdown format support
+pip install weasyprint    # PDF format support
 ```
 
 ### 3. Configure (Optional)
 
-Click the extension icon to open the popup. The default server URL is `http://localhost:8765`. Change it if your server runs on a different host/port.
+Click the extension icon to open the popup. You can configure:
+- **Server URL** — default is `http://localhost:8765`
+- **Save Format** — HTML, Markdown, or PDF
 
 ## Usage
 
@@ -55,7 +59,10 @@ Click the extension icon to open the popup. The default server URL is `http://lo
 
 1. **Content extraction** (runs in the page): Finds the main article element, clones it, resolves all image URLs (including lazy-loaded, srcset, picture elements, CSS backgrounds)
 2. **Image download** (runs in the background service worker): Fetches all images with credentials, converts to base64 data URLs, replaces in HTML
-3. **Server save**: POSTs the self-contained HTML to your backend
+3. **Server save**: POSTs the content to your backend, which saves as the chosen format:
+   - **HTML**: Self-contained file with base64 images inline
+   - **Markdown**: `.md` file with images extracted to a `_images/` subfolder
+   - **PDF**: Rendered PDF with images embedded
 
 ## Backend API
 
@@ -66,6 +73,7 @@ The extension sends a `POST` to `{serverUrl}/save-blog-post` with:
   "title": "Article Title",
   "html": "<article>...content with embedded base64 images...</article>",
   "url": "https://original-source.com/article",
+  "format": "html",
   "images": {},
   "download_images": true
 }
