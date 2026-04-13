@@ -44,18 +44,153 @@ captureBtn.addEventListener('click', function() {
 
 // Content extraction function — injected into the active tab
 function extractContent() {
-  var selectors = ['article', '.post-content', '[role=main]', 'main'];
-  var c = null;
-  for (var si = 0; si < selectors.length; si++) {
-    var el = document.querySelector(selectors[si]);
-    if (el) { c = el; break; }
+  var boilerplateMarkers = [
+    'contents & disclosures',
+    'report at a glance',
+    'exhibit gallery',
+    'audiocast',
+    'visualizations'
+  ];
+
+  function normalizeText(text) {
+    return (text || '').replace(/\s+/g, ' ').trim();
   }
+
+  function isGenericTitle(text) {
+    text = normalizeText(text);
+    if (!text) return true;
+    var lower = text.toLowerCase();
+    if (['article', 'research', 'report', 'overview', 'home'].indexOf(lower) !== -1) return true;
+    if (text.length <= 3) return true;
+    return text.indexOf(' ') === -1 && text.length <= 8;
+  }
+
+  function hasBoilerplatePrefix(text) {
+    var lower = normalizeText(text).toLowerCase().slice(0, 1800);
+    for (var i = 0; i < boilerplateMarkers.length; i++) {
+      if (lower.indexOf(boilerplateMarkers[i]) !== -1) return true;
+    }
+    return false;
+  }
+
+  function scoreContainer(el, bodyTextLen) {
+    var text = normalizeText(el.innerText || el.textContent);
+    var textLen = text.length;
+    if (textLen < MIN_CONTENT_LENGTH) return { score: -1, textLen: textLen };
+
+    var depth = 0;
+    var p = el;
+    while (p.parentElement) { depth++; p = p.parentElement; }
+
+    var tables = el.querySelectorAll('table').length;
+    var imgs = el.querySelectorAll('img').length;
+    var headings = el.querySelectorAll('h1, h2, h3').length;
+    var paras = el.querySelectorAll('p').length;
+    var score = textLen + (depth * 40) + (tables * 700) + (imgs * 120) + (headings * 180) + (paras * 120);
+
+    if (hasBoilerplatePrefix(text)) score -= 5000;
+    if (bodyTextLen && textLen > bodyTextLen * 0.95) score -= 1200;
+    if (el.matches('article, main')) score += 500;
+
+    return { score: score, textLen: textLen };
+  }
+
+  function deriveTitle(container, fallbackTitle) {
+    var candidates = [];
+    var seen = {};
+
+    function addCandidate(text, score) {
+      text = normalizeText(text);
+      if (!text || text.length < 4 || text.length > 160) return;
+      var lower = text.toLowerCase();
+      if (seen[lower]) return;
+      if (boilerplateMarkers.indexOf(lower) !== -1) return;
+      candidates.push({ text: text, score: score });
+      seen[lower] = true;
+    }
+
+    if (!isGenericTitle(fallbackTitle)) addCandidate(fallbackTitle, 50);
+
+    var embeddedTitles = container.querySelectorAll('title');
+    for (var i = 0; i < embeddedTitles.length && i < 8; i++) {
+      var embedded = normalizeText(embeddedTitles[i].textContent);
+      if (!isGenericTitle(embedded)) addCandidate(embedded, 1000 - (i * 10));
+    }
+
+    var headings = container.querySelectorAll('h1, h2, h3');
+    for (var j = 0; j < headings.length && j < 20; j++) {
+      var headingText = normalizeText(headings[j].textContent);
+      var score = headings[j].tagName === 'H1' ? 900 : (headings[j].tagName === 'H2' ? 700 : 500);
+      addCandidate(headingText, score - (j * 10));
+    }
+
+    if (!candidates.length) return normalizeText(fallbackTitle) || document.title;
+
+    candidates.sort(function(a, b) {
+      if (b.score !== a.score) return b.score - a.score;
+      return b.text.length - a.text.length;
+    });
+    return candidates[0].text;
+  }
+
+  // Find the best content container by picking the selector with the most text
+  var selectors = ['article', '.post-content', '.article-content', '.report-content',
+                   '.research-content', '.entry-content', '[role=main]', 'main',
+                   '.content-body', '.post-body', '#content', '#article-body'];
+  var c = null;
+  var matchedSelector = 'body (fallback)';
+  var bodyTextLen = normalizeText(document.body.innerText || document.body.textContent).length;
+  var bestTextLen = 0;
+  var bestScore = -1;
+  var MIN_CONTENT_LENGTH = 200;
+
+  for (var si = 0; si < selectors.length; si++) {
+    var elements = document.querySelectorAll(selectors[si]);
+    for (var ei = 0; ei < elements.length; ei++) {
+      var el = elements[ei];
+      var scored = scoreContainer(el, bodyTextLen);
+      var textLen = scored.textLen;
+      console.log('[AI Notes] Selector "' + selectors[si] + '[' + ei + ']": ' + el.querySelectorAll('img').length + ' imgs, ' + textLen + ' chars');
+      if (textLen >= MIN_CONTENT_LENGTH && scored.score > bestScore) {
+        c = el;
+        matchedSelector = selectors[si] + '[' + ei + ']';
+        bestTextLen = textLen;
+        bestScore = scored.score;
+      }
+    }
+  }
+
+  // If no good selector match, find the deepest element with the most content
+  if (!c || bestTextLen < 500) {
+    console.log('[AI Notes] Standard selectors insufficient (' + bestTextLen + ' chars), scanning DOM...');
+    var candidates = document.body.querySelectorAll('div, section');
+    var best = c;
+    var autoBestScore = bestScore;
+    for (var ci = 0; ci < candidates.length; ci++) {
+      var el = candidates[ci];
+      var scored = scoreContainer(el, bodyTextLen);
+      var tl = scored.textLen;
+      if (tl < 500 || tl > bodyTextLen * 0.95) continue;
+      if (scored.score > autoBestScore) {
+        best = el;
+        autoBestScore = scored.score;
+        matchedSelector = el.tagName + '.' + (el.className || '').toString().split(' ')[0] + ' (auto)';
+      }
+    }
+    if (best && best !== c) {
+      c = best;
+      console.log('[AI Notes] Auto-detected content: ' + matchedSelector + ' (' + c.textContent.trim().length + ' chars)');
+    }
+  }
+
   if (!c) c = document.body;
+  console.log('[AI Notes] Using: ' + matchedSelector + ', ' + c.querySelectorAll('img').length + ' imgs, ' + c.textContent.trim().length + ' chars');
 
   var t = document.title
     .replace(/^\(\d+\)\s*/, '')
     .replace(/\s*[-–|](?:\s*by\s*)?\s*[^-–|]*$/i, '')
     .trim();
+  t = deriveTitle(c, t);
 
   var u = location.href;
 
